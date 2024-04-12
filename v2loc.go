@@ -46,7 +46,7 @@ func V2Encrypt(key []byte, payload, footer any, randBytes []byte) (string, error
 		return "", fmt.Errorf("create chacha20poly1305 cipher: %w", err)
 	}
 
-	preAuth := preAuthEncode([]byte(v2LocHeader), nonce, footerBytes)
+	preAuth := pae([]byte(v2LocHeader), nonce, footerBytes)
 
 	encryptedPayload := aead.Seal(
 		payloadBytes[:0],
@@ -56,7 +56,7 @@ func V2Encrypt(key []byte, payload, footer any, randBytes []byte) (string, error
 	)
 	body := append(nonce, encryptedPayload...)
 
-	return createToken(v2LocHeader, body, footerBytes), nil
+	return buildToken(v2LocHeader, body, footerBytes), nil
 }
 
 func V2Decrypt(token string, key []byte, payload, footer any) error {
@@ -74,7 +74,7 @@ func V2Decrypt(token string, key []byte, payload, footer any) error {
 	}
 
 	nonce, encryptedPayload := body[:v2NonceSize], body[v2NonceSize:]
-	preAuth := preAuthEncode([]byte(v2LocHeader), nonce, footerBytes)
+	preAuth := pae([]byte(v2LocHeader), nonce, footerBytes)
 
 	decryptedPayload, err := aead.Open(
 		encryptedPayload[:0],
@@ -87,13 +87,13 @@ func V2Decrypt(token string, key []byte, payload, footer any) error {
 	}
 
 	if payload != nil {
-		if err := fillValue(decryptedPayload, payload); err != nil {
+		if err := fromBytes(decryptedPayload, payload); err != nil {
 			return fmt.Errorf("decode payload: %w", err)
 		}
 	}
 
 	if footer != nil {
-		if err := fillValue(footerBytes, footer); err != nil {
+		if err := fromBytes(footerBytes, footer); err != nil {
 			return fmt.Errorf("decode footer: %w", err)
 		}
 	}
