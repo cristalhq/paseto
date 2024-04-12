@@ -13,10 +13,10 @@ import (
 )
 
 const (
+	v1LocHeader    = "v1.local."
 	v1LocNonceSize = 32
 	v1LocNonceHalf = v1LocNonceSize / 2
 	v1LocMacSize   = 48 // const for crypty.SHA384.Size()
-	v1LocHeader    = "v1.local."
 )
 
 func V1Encrypt(key []byte, payload, footer any, randBytes []byte) (string, error) {
@@ -96,7 +96,7 @@ func V1Decrypt(token string, key []byte, payload, footer any) error {
 	}
 
 	if !hmac.Equal(h.Sum(nil), mac) {
-		return fmt.Errorf("token signature: %w", ErrInvalidTokenAuth)
+		return ErrInvalidTokenAuth
 	}
 
 	block, err := aes.NewCipher(encKey)

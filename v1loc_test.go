@@ -21,9 +21,7 @@ func TestV1Loc_Encrypt(t *testing.T) {
 			nonce := must(hex.DecodeString(tc.Nonce))
 
 			token, err := V1Encrypt(key, payload, footer, nonce)
-			if err != nil {
-				t.Fatal(err)
-			}
+			mustOk(t, err)
 			mustEqual(t, token, tc.Token)
 		})
 	}
