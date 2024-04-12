@@ -2,6 +2,20 @@ package paseto
 
 import "encoding/json"
 
+type TokenType uint
+
+const (
+	TokenUnknown  TokenType = 0
+	TokenV1Local  TokenType = 1
+	TokenV1Public TokenType = 2
+	TokenV2Local  TokenType = 3
+	TokenV2Public TokenType = 4
+	TokenV3Local  TokenType = 5
+	TokenV3Public TokenType = 6
+	TokenV4Local  TokenType = 7
+	TokenV4Public TokenType = 8
+)
+
 type Token struct {
 	typ    TokenType
 	raw    []byte
@@ -67,17 +81,3 @@ func (t *Token) DecodeFooter(dst any) error {
 func (t *Token) isValid() bool {
 	return t != nil && len(t.raw) > 0
 }
-
-type TokenType uint
-
-const (
-	TokenUnknown  TokenType = 0
-	TokenV1Local  TokenType = 1
-	TokenV1Public TokenType = 2
-	TokenV2Local  TokenType = 3
-	TokenV2Public TokenType = 4
-	TokenV3Local  TokenType = 5
-	TokenV3Public TokenType = 6
-	TokenV4Local  TokenType = 7
-	TokenV4Public TokenType = 8
-)

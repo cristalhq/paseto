@@ -21,7 +21,7 @@ See [docs][pkg-url] or [GUIDE.md](https://github.com/cristalhq/paseto/blob/main/
 
 ## Install
 
-Go version 1.18+
+Go version 1.21+
 
 ```
 go get github.com/cristalhq/paseto
