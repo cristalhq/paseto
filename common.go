@@ -10,14 +10,23 @@ import (
 )
 
 func pae(pieces ...[]byte) []byte {
-	var buf bytes.Buffer
-	binary.Write(&buf, binary.LittleEndian, int64(len(pieces)))
-
-	for _, p := range pieces {
-		binary.Write(&buf, binary.LittleEndian, int64(len(p)))
-		buf.Write(p)
+	size := 8
+	for i := range pieces {
+		size += 8 + len(pieces[i])
 	}
-	return buf.Bytes()
+
+	buf := make([]byte, size)
+	binary.LittleEndian.PutUint64(buf, uint64(len(pieces)))
+
+	idx := 8
+	for i := range pieces {
+		binary.LittleEndian.PutUint64(buf[idx:], uint64(len(pieces[i])))
+		idx += 8
+
+		copy(buf[idx:], pieces[i])
+		idx += len(pieces[i])
+	}
+	return buf
 }
 
 func toBytes(x any) ([]byte, error) {
