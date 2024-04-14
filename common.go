@@ -2,6 +2,7 @@ package paseto
 
 import (
 	"bytes"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
@@ -50,7 +51,7 @@ func fromBytes(data []byte, x any) error {
 		*f = append(*f, data...)
 	default:
 		if err := json.Unmarshal(data, x); err != nil {
-			return fmt.Errorf("%v: %w", err, ErrDataUnmarshal)
+			return fmt.Errorf("%w: %v", ErrDataUnmarshal, err)
 		}
 	}
 	return nil
@@ -89,7 +90,7 @@ func splitToken(token, header string) ([]byte, []byte, error) {
 	return payload, footer, nil
 }
 
-func buildToken(header string, body, footer []byte) string {
+func buildToken(header, body, footer []byte) string {
 	size := len(header) + b64EncodedLen(len(body))
 	if len(footer) > 0 {
 		size += 1 + b64EncodedLen(len(footer))
@@ -123,4 +124,8 @@ func b64Encode(dst, src []byte) {
 
 func b64EncodedLen(n int) int {
 	return base64.RawURLEncoding.EncodedLen(n)
+}
+
+func constTimeEq(x, y int32) bool {
+	return subtle.ConstantTimeEq(x, y) == 1
 }
