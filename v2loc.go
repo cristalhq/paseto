@@ -56,7 +56,7 @@ func V2Encrypt(key []byte, payload, footer any, randBytes []byte) (string, error
 	)
 	body := append(nonce, encryptedPayload...)
 
-	return buildToken(v2LocHeader, body, footerBytes), nil
+	return buildToken([]byte(v2LocHeader), body, footerBytes), nil
 }
 
 func V2Decrypt(token string, key []byte, payload, footer any) error {
