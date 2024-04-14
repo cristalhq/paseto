@@ -10,7 +10,7 @@ func TestV2Loc_Encrypt(t *testing.T) {
 	testCases := loadGoldenFile("testdata/v2.json")
 
 	for _, tc := range testCases.Tests {
-		if tc.Key == "" || !strings.HasPrefix(tc.Token, v2LocHeader) {
+		if tc.Key == "" || !strings.HasPrefix(tc.Token, v2locHeader) {
 			continue
 		}
 
@@ -33,7 +33,7 @@ func TestV2Loc_Decrypt(t *testing.T) {
 	testCases := loadGoldenFile("testdata/v2.json")
 
 	for _, tc := range testCases.Tests {
-		if tc.Key == "" || !strings.HasPrefix(tc.Token, v2LocHeader) {
+		if tc.Key == "" || !strings.HasPrefix(tc.Token, v2locHeader) {
 			continue
 		}
 
