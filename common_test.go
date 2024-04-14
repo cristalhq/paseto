@@ -43,7 +43,7 @@ func BenchmarkPAE(b *testing.B) {
 	var footerBytes []byte
 
 	pieces := [][]byte{
-		[]byte(v1LocHeader),
+		[]byte(v1locHeader),
 		nonce[:],
 		encryptedPayload[:],
 		footerBytes,

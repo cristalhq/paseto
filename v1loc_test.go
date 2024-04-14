@@ -10,7 +10,7 @@ func TestV1Loc_Encrypt(t *testing.T) {
 	testCases := loadGoldenFile("testdata/v1.json")
 
 	for _, tc := range testCases.Tests {
-		if tc.Key == "" || !strings.HasPrefix(tc.Token, v1LocHeader) {
+		if tc.Key == "" || !strings.HasPrefix(tc.Token, v1locHeader) {
 			continue
 		}
 
@@ -30,8 +30,8 @@ func TestV1Loc_Encrypt(t *testing.T) {
 func TestV1Loc_Decrypt(t *testing.T) {
 	testCases := loadGoldenFile("testdata/v1.json")
 
-	for _, tc := range testCases.Tests[:] {
-		if tc.Key == "" || !strings.HasPrefix(tc.Token, v1LocHeader) {
+	for _, tc := range testCases.Tests {
+		if tc.Key == "" || !strings.HasPrefix(tc.Token, v1locHeader) {
 			continue
 		}
 
