@@ -7,4 +7,5 @@ var (
 	ErrInvalidTokenAuth     = errors.New("invalid token authentication")
 	ErrIncorrectTokenFormat = errors.New("incorrect token format")
 	ErrIncorrectTokenHeader = errors.New("incorrect token header")
+	ErrDateInvalidFormat    = errors.New("date is not valid")
 )
