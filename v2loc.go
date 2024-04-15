@@ -1,10 +1,8 @@
 package paseto
 
 import (
-	"crypto/rand"
 	"errors"
 	"fmt"
-	"io"
 
 	"golang.org/x/crypto/chacha20poly1305"
 )
@@ -42,10 +40,7 @@ func V2Encrypt(key []byte, payload, footer any, randBytes []byte) (string, error
 	// step 3.
 	b := randBytes
 	if b == nil {
-		b = make([]byte, v2locNonce)
-		if _, err := io.ReadFull(rand.Reader, b); err != nil {
-			return "", fmt.Errorf("read from crypto/rand.Reader: %w", err)
-		}
+		b = readRand(v2locNonce)
 	}
 
 	// step 4.

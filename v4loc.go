@@ -2,10 +2,8 @@ package paseto
 
 import (
 	"crypto/hmac"
-	"crypto/rand"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 )
 
@@ -45,10 +43,7 @@ func V4Encrypt(key []byte, payload, footer any, implicit string, randBytes []byt
 	// step 3.
 	n := randBytes
 	if n == nil {
-		n = make([]byte, v4locNonce)
-		if _, err := io.ReadFull(rand.Reader, n); err != nil {
-			return "", fmt.Errorf("read from crypto/rand.Reader: %w", err)
-		}
+		n = readRand(v4locNonce)
 	}
 
 	// step 4.
