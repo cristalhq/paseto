@@ -1,17 +1,12 @@
 package paseto
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha512"
 	"errors"
 	"fmt"
 	"io"
 	"strings"
-
-	"golang.org/x/crypto/hkdf"
 )
 
 const (
@@ -55,9 +50,7 @@ func V1Encrypt(key []byte, payload, footer any, randBytes []byte) (string, error
 	}
 
 	// step 4.
-	hash := hmac.New(sha512.New384, b)
-	hash.Write(m)
-	n := hash.Sum(nil)[:v1locNonce]
+	n := doHMACSHA384(b, m)[:v1locNonce]
 
 	// step 5.
 	ek, ak, err := v1locSplitKey(k, n[:v1locNonceH])
@@ -66,21 +59,13 @@ func V1Encrypt(key []byte, payload, footer any, randBytes []byte) (string, error
 	}
 
 	// step 6.
-	block, err := aes.NewCipher(ek)
-	if err != nil {
-		return "", fmt.Errorf("create aes cipher: %w", err)
-	}
-	c := make([]byte, len(m))
-	ciph := cipher.NewCTR(block, n[v1locNonceH:])
-	ciph.XORKeyStream(c, m)
+	c := doAES256CTR(ek, n[v1locNonceH:], m)
 
 	// step 7.
 	preAuth := pae(h, n, c, f)
 
 	// step 8.
-	hasher := hmac.New(sha512.New384, ak)
-	hasher.Write(preAuth)
-	t := hasher.Sum(nil)
+	t := doHMACSHA384(ak, preAuth)
 
 	// step 9.
 	body := make([]byte, 0, len(n)+len(c)+len(t))
@@ -133,9 +118,7 @@ func V1Decrypt(token string, key []byte, payload, footer any) error {
 	preAuth := pae(h, n, c, f)
 
 	// step 7.
-	hasher := hmac.New(sha512.New384, ak)
-	hasher.Write(preAuth)
-	t2 := hasher.Sum(nil)
+	t2 := doHMACSHA384(ak, preAuth)
 
 	// step 8.
 	if !hmac.Equal(t2, t) {
@@ -143,23 +126,16 @@ func V1Decrypt(token string, key []byte, payload, footer any) error {
 	}
 
 	// step 9.
-	block, err := aes.NewCipher(ek)
-	if err != nil {
-		return fmt.Errorf("create aes cipher: %w", err)
-	}
-
-	decryptedPayload := make([]byte, len(c))
-	ciph := cipher.NewCTR(block, n[v1locNonceH:])
-	ciph.XORKeyStream(decryptedPayload, c)
+	p := doAES256CTR(ek, n[v1locNonceH:], c)
 
 	if payload != nil {
-		if err := fromBytes(decryptedPayload, payload); err != nil {
+		if err := fromBytes(p, payload); err != nil {
 			return fmt.Errorf("decode payload: %w", err)
 		}
 	}
 
 	if footer != nil {
-		if err := fromBytes(footerBytes, footer); err != nil {
+		if err := fromBytes(f, footer); err != nil {
 			return fmt.Errorf("decode footer: %w", err)
 		}
 	}
@@ -167,16 +143,16 @@ func V1Decrypt(token string, key []byte, payload, footer any) error {
 }
 
 func v1locSplitKey(key, salt []byte) ([]byte, []byte, error) {
-	eReader := hkdf.New(sha512.New384, key, salt, []byte("paseto-encryption-key"))
-	aReader := hkdf.New(sha512.New384, key, salt, []byte("paseto-auth-key-for-aead"))
+	er := doHKDF(key, salt, []byte("paseto-encryption-key"))
+	ar := doHKDF(key, salt, []byte("paseto-auth-key-for-aead"))
 
 	ek := make([]byte, 32)
 	ak := make([]byte, 32)
 
-	if _, err := io.ReadFull(eReader, ek); err != nil {
+	if _, err := io.ReadFull(er, ek); err != nil {
 		return nil, nil, err
 	}
-	if _, err := io.ReadFull(aReader, ak); err != nil {
+	if _, err := io.ReadFull(ar, ak); err != nil {
 		return nil, nil, err
 	}
 	return ek, ak, nil
