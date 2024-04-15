@@ -2,7 +2,6 @@ package paseto
 
 import (
 	"crypto/hmac"
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
@@ -45,10 +44,7 @@ func V3Encrypt(key []byte, payload, footer any, implicit string, randBytes []byt
 	// step 3.
 	n := randBytes
 	if n == nil {
-		n = make([]byte, v3locNonce)
-		if _, err := io.ReadFull(rand.Reader, n); err != nil {
-			return "", fmt.Errorf("read from crypto/rand.Reader: %w", err)
-		}
+		n = readRand(v3locNonce)
 	}
 
 	// step 4.

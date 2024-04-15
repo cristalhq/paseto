@@ -5,6 +5,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha512"
 	"crypto/subtle"
 	"encoding/base64"
@@ -176,6 +177,14 @@ func doSealCHACHA(key, nonce, m, a []byte) []byte {
 
 func doHKDF(key, salt, info []byte) io.Reader {
 	return hkdf.New(sha512.New384, key, salt, info)
+}
+
+func readRand(size int) []byte {
+	b := make([]byte, size)
+	if _, err := io.ReadFull(rand.Reader, b); err != nil {
+		panic(err)
+	}
+	return b
 }
 
 func b64Decode(dst, src []byte) (n int, err error) {
