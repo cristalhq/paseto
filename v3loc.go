@@ -1,18 +1,12 @@
 package paseto
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha512"
-	"crypto/subtle"
 	"errors"
 	"fmt"
 	"io"
 	"strings"
-
-	"golang.org/x/crypto/hkdf"
 )
 
 const (
@@ -41,7 +35,7 @@ func V3Encrypt(key []byte, payload, footer any, implicit string, randBytes []byt
 	i := []byte(implicit)
 
 	// step 1.
-	if subtle.ConstantTimeEq(int32(len(k)), v3locKey) != 1 {
+	if !constTimeEq(int32(len(k)), v3locKey) {
 		return "", errors.New("bad key")
 	}
 
@@ -64,21 +58,13 @@ func V3Encrypt(key []byte, payload, footer any, implicit string, randBytes []byt
 	}
 
 	// step 5.
-	block, err := aes.NewCipher(ek)
-	if err != nil {
-		return "", fmt.Errorf("create aes cipher: %w", err)
-	}
-	c := make([]byte, len(m))
-	ciph := cipher.NewCTR(block, n2)
-	ciph.XORKeyStream(c, m)
+	c := doAES256CTR(ek, n2, m)
 
 	// step 6.
 	preAuth := pae(h, n, c, f, i)
 
 	// step 7.
-	hasher := hmac.New(sha512.New384, ak)
-	hasher.Write(preAuth)
-	t := hasher.Sum(nil)
+	t := doHMACSHA384(ak, preAuth)
 
 	// step 7.
 	body := make([]byte, 0, len(n)+len(c)+len(t))
@@ -96,7 +82,7 @@ func V3Decrypt(token string, key []byte, payload, footer any, implicit string) e
 	i := []byte(implicit)
 
 	// step 1.
-	if subtle.ConstantTimeEq(int32(len(k)), v3locKey) != 1 {
+	if !constTimeEq(int32(len(k)), v3locKey) {
 		return errors.New("bad key")
 	}
 
@@ -129,9 +115,7 @@ func V3Decrypt(token string, key []byte, payload, footer any, implicit string) e
 	preAuth := pae(h, n, c, f, i)
 
 	// step 7.
-	hasher := hmac.New(sha512.New384, ak)
-	hasher.Write(preAuth)
-	t2 := hasher.Sum(nil)
+	t2 := doHMACSHA384(ak, preAuth)
 
 	// step 8.
 	if !hmac.Equal(t, t2) {
@@ -139,14 +123,7 @@ func V3Decrypt(token string, key []byte, payload, footer any, implicit string) e
 	}
 
 	// step 9.
-	block, err := aes.NewCipher(ek)
-	if err != nil {
-		return fmt.Errorf("create aes cipher: %w", err)
-	}
-
-	p := make([]byte, len(c))
-	ciph := cipher.NewCTR(block, n2)
-	ciph.XORKeyStream(p, c)
+	p := doAES256CTR(ek, n2, c)
 
 	// step 7.
 	if payload != nil {
@@ -164,19 +141,19 @@ func V3Decrypt(token string, key []byte, payload, footer any, implicit string) e
 }
 
 func v3locSplitKey(key, n []byte) (ek, ak, n2 []byte, err error) {
-	eKDF := hkdf.New(sha512.New384, key, nil, append([]byte("paseto-encryption-key"), n...))
-	aKDF := hkdf.New(sha512.New384, key, nil, append([]byte("paseto-auth-key-for-aead"), n...))
+	er := doHKDF(key, nil, append([]byte("paseto-encryption-key"), n...))
+	ar := doHKDF(key, nil, append([]byte("paseto-auth-key-for-aead"), n...))
 
 	tmp := make([]byte, v3locKDF)
-	if _, err := io.ReadFull(eKDF, tmp); err != nil {
-		return nil, nil, nil, fmt.Errorf("unable to generate encryption key from seed: %w", err)
+	if _, err := io.ReadFull(er, tmp); err != nil {
+		return nil, nil, nil, err
 	}
 
 	ek, n2 = tmp[:v3locKey], tmp[v3locKey:]
 
 	ak = make([]byte, v3locKDF)
-	if _, err := io.ReadFull(aKDF, ak); err != nil {
-		return nil, nil, nil, fmt.Errorf("unable to generate authentication key from seed: %w", err)
+	if _, err := io.ReadFull(ar, ak); err != nil {
+		return nil, nil, nil, err
 	}
 	return ek, n2, ak, nil
 }

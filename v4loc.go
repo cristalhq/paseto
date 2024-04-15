@@ -7,9 +7,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-
-	"golang.org/x/crypto/blake2b"
-	"golang.org/x/crypto/chacha20"
 )
 
 const (
@@ -29,13 +26,6 @@ func V4Encrypt(key []byte, payload, footer any, implicit string, randBytes []byt
 	footerBytes, err := toBytes(footer)
 	if err != nil {
 		return "", fmt.Errorf("encode footer: %w", err)
-	}
-
-	if randBytes == nil {
-		randBytes = make([]byte, v4locNonce)
-		if _, err := io.ReadFull(rand.Reader, randBytes); err != nil {
-			return "", fmt.Errorf("read from crypto/rand.Reader: %w", err)
-		}
 	}
 
 	// step 0.
@@ -68,24 +58,13 @@ func V4Encrypt(key []byte, payload, footer any, implicit string, randBytes []byt
 	}
 
 	// step 5.
-	c := make([]byte, len(m))
-
-	ciph, err := chacha20.NewUnauthenticatedCipher(ek, n2)
-	if err != nil {
-		return "", fmt.Errorf("create chacha20 cipher: %w", err)
-	}
-	ciph.XORKeyStream(c, m)
+	c := doCHACHA20(ek, n2, m)
 
 	// step 6.
 	preAuth := pae(h, n, c, f, i)
 
 	// step 7.
-	mac, err := blake2b.New(v4locMac, ak)
-	if err != nil {
-		return "", fmt.Errorf("unable to in initialize MAC kdf: %w", err)
-	}
-	mac.Write(preAuth)
-	t := mac.Sum(nil)
+	t := doBLAKE2b(v4locMac, ak, preAuth)
 
 	// step 8.
 	body := make([]byte, 0, len(n)+len(c)+len(t))
@@ -133,12 +112,7 @@ func V4Decrypt(token string, key []byte, payload, footer any, implicit string) e
 	preAuth := pae(h, n, c, f, i)
 
 	// step 7.
-	hasher, err := blake2b.New(v4locMac, ak)
-	if err != nil {
-		return fmt.Errorf("create blake2b hash: %w", err)
-	}
-	hasher.Write(preAuth)
-	t2 := hasher.Sum(nil)
+	t2 := doBLAKE2b(v4locMac, ak, preAuth)
 
 	// step 8.
 	if !hmac.Equal(t, t2) {
@@ -146,13 +120,7 @@ func V4Decrypt(token string, key []byte, payload, footer any, implicit string) e
 	}
 
 	// step 9.
-	ciph, err := chacha20.NewUnauthenticatedCipher(ek, n2)
-	if err != nil {
-		return fmt.Errorf("create chacha20 cipher: %w", err)
-	}
-
-	p := make([]byte, len(c))
-	ciph.XORKeyStream(p, c)
+	p := doCHACHA20(ek, n2, c)
 
 	// step 10.
 	if payload != nil {
@@ -170,24 +138,9 @@ func V4Decrypt(token string, key []byte, payload, footer any, implicit string) e
 }
 
 func v4locSplitKey(key, n []byte) (ek, n2, ak []byte, err error) {
-	encKDF, err := blake2b.New(56, key)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	encKDF.Write([]byte("paseto-encryption-key"))
-	encKDF.Write(n)
-	tmp := encKDF.Sum(nil)
+	tmp := doBLAKE2b(56, key, append([]byte("paseto-encryption-key"), n...))
 	ek, n2 = tmp[:v4locKDF], tmp[v4locKDF:]
 
-	authKDF, err := blake2b.New(32, key)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	authKDF.Write([]byte("paseto-auth-key-for-aead"))
-	authKDF.Write(n)
-	ak = authKDF.Sum(nil)
-
+	ak = doBLAKE2b(32, key, append([]byte("paseto-auth-key-for-aead"), n...))
 	return ek, n2, ak, nil
 }

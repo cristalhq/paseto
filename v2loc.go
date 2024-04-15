@@ -2,12 +2,10 @@ package paseto
 
 import (
 	"crypto/rand"
-	"crypto/subtle"
 	"errors"
 	"fmt"
 	"io"
 
-	"golang.org/x/crypto/blake2b"
 	"golang.org/x/crypto/chacha20poly1305"
 )
 
@@ -34,7 +32,7 @@ func V2Encrypt(key []byte, payload, footer any, randBytes []byte) (string, error
 	f := footerBytes
 
 	// step 1.
-	if subtle.ConstantTimeEq(int32(len(k)), v2locKey) != 1 {
+	if !constTimeEq(int32(len(k)), v2locKey) {
 		return "", errors.New("bad key")
 	}
 
@@ -51,25 +49,18 @@ func V2Encrypt(key []byte, payload, footer any, randBytes []byte) (string, error
 	}
 
 	// step 4.
-	hasher, err := blake2b.New(v2locNonce, b)
-	if err != nil {
-		return "", fmt.Errorf("create blake2b hash: %w", err)
-	}
-	hasher.Write(m)
-	n := hasher.Sum(nil)
+	n := doBLAKE2b(v2locNonce, b, m)
 
 	// step 5.
 	preAuth := pae(h, n, f)
 
 	// step 6.
-	aead, err := chacha20poly1305.NewX(k)
-	if err != nil {
-		return "", fmt.Errorf("create chacha20poly1305 cipher: %w", err)
-	}
-	c := aead.Seal(m[:0], n, m, preAuth)
+	c := doSealCHACHA(k, n, m, preAuth)
 
 	// step 7.
-	body := append(n, c...)
+	body := make([]byte, 0, len(n)+len(c))
+	body = append(body, n...)
+	body = append(body, c...)
 
 	return buildToken(h, body, f), nil
 }
@@ -80,7 +71,7 @@ func V2Decrypt(token string, key []byte, payload, footer any) error {
 	k := key
 
 	// step 1.
-	if subtle.ConstantTimeEq(int32(len(k)), v2locKey) != 1 {
+	if !constTimeEq(int32(len(k)), v2locKey) {
 		return errors.New("bad key")
 	}
 
@@ -104,12 +95,7 @@ func V2Decrypt(token string, key []byte, payload, footer any) error {
 	preAuth := pae(h, n, f)
 
 	// step 6.
-	aead, err := chacha20poly1305.NewX(k)
-	if err != nil {
-		return fmt.Errorf("create chacha20poly1305 cipher: %w", err)
-	}
-
-	p, err := aead.Open(c[:0], n, c, preAuth)
+	p, err := doOpenCHACHA(k, n, c, preAuth)
 	if err != nil {
 		return ErrInvalidTokenAuth
 	}

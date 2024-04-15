@@ -2,12 +2,22 @@ package paseto
 
 import (
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/hmac"
+	"crypto/sha512"
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
+
+	"golang.org/x/crypto/blake2b"
+	"golang.org/x/crypto/chacha20"
+	"golang.org/x/crypto/chacha20poly1305"
+	"golang.org/x/crypto/hkdf"
 )
 
 func pae(pieces ...[]byte) []byte {
@@ -108,6 +118,64 @@ func buildToken(header, body, footer []byte) string {
 		b64Encode(token[offset:], footer)
 	}
 	return string(token)
+}
+
+func doHMACSHA384(key, b []byte) []byte {
+	h := hmac.New(sha512.New384, key)
+	h.Write(b)
+	return h.Sum(nil)
+}
+
+func doBLAKE2b(size int, key, b []byte) []byte {
+	h, err := blake2b.New(size, key)
+	if err != nil {
+		panic(err)
+	}
+	h.Write(b)
+	return h.Sum(nil)
+}
+
+func doAES256CTR(key, nonce, m []byte) []byte {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		panic(err)
+	}
+
+	dst := make([]byte, len(m))
+	ciph := cipher.NewCTR(block, nonce)
+	ciph.XORKeyStream(dst, m)
+	return dst
+}
+
+func doCHACHA20(key, nonce, m []byte) []byte {
+	ciph, err := chacha20.NewUnauthenticatedCipher(key, nonce)
+	if err != nil {
+		panic(err)
+	}
+
+	dst := make([]byte, len(m))
+	ciph.XORKeyStream(dst, m)
+	return dst
+}
+
+func doOpenCHACHA(key, nonce, c, a []byte) ([]byte, error) {
+	aead, err := chacha20poly1305.NewX(key)
+	if err != nil {
+		panic(err)
+	}
+	return aead.Open(nil, nonce, c, a)
+}
+
+func doSealCHACHA(key, nonce, m, a []byte) []byte {
+	aead, err := chacha20poly1305.NewX(key)
+	if err != nil {
+		panic(err)
+	}
+	return aead.Seal(nil, nonce, m, a)
+}
+
+func doHKDF(key, salt, info []byte) io.Reader {
+	return hkdf.New(sha512.New384, key, salt, info)
 }
 
 func b64Decode(dst, src []byte) (n int, err error) {
